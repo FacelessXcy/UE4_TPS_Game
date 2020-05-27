@@ -22,15 +22,45 @@ public:
 	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly,Category="Weapon")
 	TSubclassOf<UDamageType> DamageType;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TSubclassOf<class UCameraShake> FireCameraShake;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	class UParticleSystem* MuzzleEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UParticleSystem* FleshImpactEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UParticleSystem* DefaultImpactEffect;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	UParticleSystem* TraceEffect;
+
+	//ÌØÐ§²å²Û
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	FName MuzzleSocketName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	float BaseDamage;
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintCallable,Category="Weapon")
+	void PlayFireEffects(FVector TraceEndPoint);
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void Fire();
 
+	FTimerHandle TimerHandle_TimeBetweenShots;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	float TimeBetweenShots;
+
+	float LastFireTime;
 public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+
+	void StartFire();
+	void EndFire();
 
 };

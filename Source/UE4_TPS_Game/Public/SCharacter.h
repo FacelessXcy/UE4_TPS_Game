@@ -22,9 +22,23 @@ public:
 	class USpringArmComponent* SpringArmComp;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
-		TSubclassOf<class ASWeapon> WeaponClass;
+	TSubclassOf<class ASWeapon> WeaponClass;
+
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Weapon")
-	ASWeapon* Weapon;
+	ASWeapon* CurrentWeapon;
+
+	//ÊÇ·ñÒª¿ª¾µ
+	bool bWantToZoom;
+
+	float DefaultFOV;
+
+	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite,Category="Player")
+	float ZoomedFov;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Player",meta=(ClampMin=0.1,ClampMax=100))
+	float ZoomInterpSpeed;
+
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -37,6 +51,12 @@ protected:
 
 	void MoveForward(float Value);
 	void MoveRight(float Value);
+
+	void StartZoom();
+	void EndZoom();
+
+	void StartFire();
+	void EndFire();
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

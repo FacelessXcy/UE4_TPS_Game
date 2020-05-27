@@ -4,3 +4,5 @@
 
 #include "CoreMinimal.h"
 
+#define SURFACETYPE_FleshDefault EPhysicalSurface::SurfaceType1
+#define SURFACETYPE_FleshVulnerable EPhysicalSurface::SurfaceType2
