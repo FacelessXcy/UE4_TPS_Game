@@ -16,7 +16,7 @@ public:
 	UPROPERTY()
 	TEnumAsByte<EPhysicalSurface> SurfaceType;
 	UPROPERTY()
-	FVector_NetQuantizeNormal TraceTo;
+	FVector_NetQuantize TraceTo;
 };
 
 UCLASS()
