@@ -11,6 +11,7 @@
 #include "../UE4_TPS_Game.h"
 #include "UObject/ConstructorHelpers.h"
 #include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
 
 //自定义命令行命令
 static int32 DebugWeaponDrawing = 0;
@@ -25,7 +26,8 @@ ASWeapon::ASWeapon()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
-
+	NetUpdateFrequency = 66.0f; 
+	MinNetUpdateFrequency = 33.0f;
 	this->MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("MeshComp"));
 	this->RootComponent = this->MeshComp;
 
@@ -53,11 +55,17 @@ ASWeapon::ASWeapon()
 	{
 		this->TraceEffect = TE.Object;
 	}
+	//复制到客户端
+	SetReplicates(true);
 }	
 
 
 void ASWeapon::Fire()
 {
+	if (Role <ROLE_Authority)
+	{
+		ServerFire();
+	}
 	AActor* MyOwner = GetOwner();
 	if (MyOwner)
 	{
@@ -66,6 +74,9 @@ void ASWeapon::Fire()
 		//重写了FVector ASCharacter::GetPawnViewLocation() const
 		MyOwner->GetActorEyesViewPoint(OUT EyeLocation,OUT EyeRotation);
 		FVector ShotDirection = EyeRotation.Vector();
+		
+		float HalfRad = FMath::DegreesToRadians(1.0f);
+		ShotDirection = FMath::VRandCone(ShotDirection, HalfRad, HalfRad);
 		FVector EndLocation = EyeLocation + ShotDirection * 10000;
 
 		FVector TracerEndPoint=EndLocation;
@@ -81,8 +92,11 @@ void ASWeapon::Fire()
 		ColParams.bTraceComplex = true;
 		//是否返回物理材质
 		ColParams.bReturnPhysicalMaterial = true;
+
+		EPhysicalSurface SurfaceType;
+
 		//返回值为是否检测到物体
-		bool bIsHitObject = this->GetWorld()->LineTraceSingleByChannel(OUT OutHit, EyeLocation, EndLocation, ECC_Visibility, ColParams);
+		bool bIsHitObject = this->GetWorld()->LineTraceSingleByChannel(OUT OutHit, EyeLocation, EndLocation, COLLISION_WEAPON, ColParams);
 		if (bIsHitObject)
 		{
 			TracerEndPoint = OutHit.ImpactPoint;
@@ -92,37 +106,69 @@ void ASWeapon::Fire()
 			//UE_LOG(LogTemp, Warning, TEXT("Hit Something"));
 
 			//获取返回的材质的类型
-			EPhysicalSurface SurfaceType = UPhysicalMaterial::DetermineSurfaceType(OutHit.PhysMaterial.Get());
-			UParticleSystem* SelectedEffect = nullptr;
-			switch (SurfaceType)
-			{
-			case SURFACETYPE_FleshDefault:
-				UGameplayStatics::ApplyPointDamage(HitActor,this->BaseDamage, ShotDirection, OutHit, MyOwner->GetInstigatorController(), this, DamageType);
-				SelectedEffect = this->FleshImpactEffect;
-				break;
-			case SURFACETYPE_FleshVulnerable:
-				UGameplayStatics::ApplyPointDamage(HitActor, this->BaseDamage*4.0f, ShotDirection, OutHit, MyOwner->GetInstigatorController(), this, DamageType);
-				SelectedEffect = this->FleshImpactEffect;
-				break;
-			default:
-				SelectedEffect = this->DefaultImpactEffect;
-				break;
-			}
+			SurfaceType = UPhysicalMaterial::DetermineSurfaceType(OutHit.PhysMaterial.Get());
+			
+			UGameplayStatics::ApplyPointDamage(HitActor, this->BaseDamage * 4.0f, ShotDirection, OutHit, MyOwner->GetInstigatorController(), this, DamageType);
 
-			if (SelectedEffect)
-			{
-				//生成打击特效
-				UGameplayStatics::SpawnEmitterAtLocation(this->GetWorld(), SelectedEffect, OutHit.ImpactPoint, OutHit.ImpactNormal.Rotation());
-			}
+			PlayImpactEffect(SurfaceType, OutHit.ImpactPoint);
 		}
 		if (DebugWeaponDrawing>0)
 		{
 			//辅助线
 			DrawDebugLine(this->GetWorld(), EyeLocation, EndLocation,FColor::White,false,1.0f,0,1);
 		}
+
 		PlayFireEffects(TracerEndPoint);
+		if (this->Role==ROLE_Authority)
+		{
+			HitScanTrace.TraceTo = TracerEndPoint;
+			HitScanTrace.SurfaceType = SurfaceType;
+		}
+
 		//获取最后一次的开火时间
 		LastFireTime = this->GetWorld()->TimeSeconds;
+	}
+}
+
+void ASWeapon::ServerFire_Implementation()
+{
+	Fire();
+}
+
+bool ASWeapon::ServerFire_Validate()
+{
+	return true;
+}
+
+void ASWeapon::OnRep_HitScanTrace()
+{
+	//通过服务器端，分发给所有客户端
+	PlayFireEffects(HitScanTrace.TraceTo);
+	PlayImpactEffect(HitScanTrace.SurfaceType, HitScanTrace.TraceTo);
+}
+
+void ASWeapon::PlayImpactEffect(EPhysicalSurface SurfaceType, FVector ImpactPoint)
+{
+	UParticleSystem* SelectedEffect = nullptr;
+	switch (SurfaceType)
+	{
+	case SURFACETYPE_FleshDefault:
+	case SURFACETYPE_FleshVulnerable:
+		SelectedEffect = this->FleshImpactEffect;
+		break;
+	default:
+		SelectedEffect = this->DefaultImpactEffect;
+		break;
+	}
+
+	if (SelectedEffect)
+	{
+		FVector MuzzleLocation = this->MeshComp->GetSocketLocation(MuzzleSocketName);
+		FVector ShotDirection = ImpactPoint - MuzzleLocation;
+		ShotDirection.Normalize();
+
+		//生成打击特效
+		UGameplayStatics::SpawnEmitterAtLocation(this->GetWorld(), SelectedEffect, ImpactPoint, ShotDirection.Rotation());
 	}
 }
 
@@ -154,7 +200,7 @@ void ASWeapon::PlayFireEffects(FVector TracerEndPoint)
 		UParticleSystemComponent* TracerComp = UGameplayStatics::SpawnEmitterAtLocation(this->GetWorld(), this->TraceEffect, MuzzleSocketLocation);
 		if (TracerComp)
 		{
-			TracerComp->SetVectorParameter(TEXT("BeamEnd"), TracerEndPoint);
+			TracerComp->SetVectorParameter("BeamEnd", TracerEndPoint);
 		}
 	}
 
@@ -168,4 +214,13 @@ void ASWeapon::PlayFireEffects(FVector TracerEndPoint)
 			PlayerController->ClientPlayCameraShake(this->FireCameraShake);
 		}
 	}
+}
+//指定复制Actor的内容和方式
+void ASWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	//HitScanTrace复制到ASWeapon上 
+	//COND_SkipOwner 服务器端在分发时，忽略发送者
+	DOREPLIFETIME_CONDITION(ASWeapon, HitScanTrace, COND_SkipOwner);
+
 }

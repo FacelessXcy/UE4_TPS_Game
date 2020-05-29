@@ -6,6 +6,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "SWeapon.h"
+#include "Components/SHealthComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Net/UnrealNetwork.h"
 
 
 // Sets default values
@@ -22,6 +25,9 @@ ASCharacter::ASCharacter()
 	this->CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("CameraComp"));
 	this->CameraComp->SetupAttachment(SpringArmComp,USpringArmComponent::SocketName);
 
+	this->HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
+
+
 	//开启下蹲功能
 	this->GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
 
@@ -30,26 +36,32 @@ ASCharacter::ASCharacter()
 	this->ZoomedFov = 65.0f;
 	this->bWantToZoom = false;
 	this->ZoomInterpSpeed = 20.0f;
+	this->bDied = false;
 }
 
 // Called when the game starts or when spawned
 void ASCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	this->HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
 	if (WeaponClass)
 	{
 		FActorSpawnParameters MySpawnPara = FActorSpawnParameters();
 		MySpawnPara.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		MySpawnPara.Owner = this;
 
-		this->CurrentWeapon = this->GetWorld()->SpawnActor<ASWeapon>(this->WeaponClass, FTransform(FRotator::ZeroRotator, FVector::ZeroVector),MySpawnPara);
-		if (CurrentWeapon)
+		//在服务器端运行
+		if (this->GetLocalRole()==ROLE_Authority)
 		{
-			/*this->CurrentWeapon->K2_AttachToComponent(this->GetMesh(), TEXT("WeaponSocket"), EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, true);*/
+			this->CurrentWeapon = this->GetWorld()->SpawnActor<ASWeapon>(this->WeaponClass, FTransform(FRotator::ZeroRotator, FVector::ZeroVector), MySpawnPara);
+			if (CurrentWeapon)
+			{
+				/*this->CurrentWeapon->K2_AttachToComponent(this->GetMesh(), TEXT("WeaponSocket"), EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, EAttachmentRule::SnapToTarget, true);*/
 
-			//this->CurrentWeapon->SetOwner(this);
-			
-			this->CurrentWeapon->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
+				//this->CurrentWeapon->SetOwner(this);
+
+				this->CurrentWeapon->AttachToComponent(this->GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
+			}
 		}
 	}
 	
@@ -152,4 +164,29 @@ void ASCharacter::EndFire()
 	{
 		this->CurrentWeapon->EndFire();
 	}
+}
+
+void ASCharacter::OnHealthChanged(USHealthComponent* HealthComponent, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
+{
+	if (!this->bDied&&Health<=0.0f)
+	{
+		this->bDied = true;
+		GetMovementComponent()->StopMovementImmediately();
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		
+		//解开控制器对Pawn的控制
+		DetachFromControllerPendingDestroy();
+
+		//设置Pawn存活时间，到期后，销毁
+		SetLifeSpan(10.0f);
+	}
+}
+
+//指定复制Actor的内容和方式
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	//CurrentWeapon复制到ASCharacter上
+	DOREPLIFETIME(ASCharacter, CurrentWeapon);
+	DOREPLIFETIME(ASCharacter, bDied);
 }

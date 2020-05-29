@@ -24,7 +24,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
 	TSubclassOf<class ASWeapon> WeaponClass;
 
-	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Weapon")
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Replicated,Category="Weapon")
 	ASWeapon* CurrentWeapon;
 
 	//ÊÇ·ñÒª¿ª¾µ
@@ -38,7 +38,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Player",meta=(ClampMin=0.1,ClampMax=100))
 	float ZoomInterpSpeed;
 
+	UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Health")
+	class USHealthComponent* HealthComp;
 
+	UPROPERTY(Replicated,BlueprintReadOnly,Category="Health")
+	bool bDied;
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -57,6 +61,9 @@ protected:
 
 	void StartFire();
 	void EndFire();
+
+	UFUNCTION()
+	void OnHealthChanged(USHealthComponent* HealthComponent, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

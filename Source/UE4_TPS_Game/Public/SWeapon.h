@@ -6,6 +6,19 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
+USTRUCT()
+struct FHitScanTrace
+{
+	GENERATED_BODY()
+
+public:
+	//枚举转化为字节流
+	UPROPERTY()
+	TEnumAsByte<EPhysicalSurface> SurfaceType;
+	UPROPERTY()
+	FVector_NetQuantizeNormal TraceTo;
+};
+
 UCLASS()
 class UE4_TPS_GAME_API ASWeapon : public AActor
 {
@@ -52,12 +65,28 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void Fire();
 
+	//Server在服务器端运行的函数
+	//Reliable保证连接到服务器
+	//WithValidation检验合法性，通常与Server配套使用
+	UFUNCTION(Server,Reliable,WithValidation)
+	void ServerFire();
+
 	FTimerHandle TimerHandle_TimeBetweenShots;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	float TimeBetweenShots;
 
 	float LastFireTime;
+
+	//属性与网络复制有关。复制属性时通知参与者
+	UPROPERTY(ReplicatedUsing=OnRep_HitScanTrace)
+	FHitScanTrace HitScanTrace;
+
+	UFUNCTION()
+	void OnRep_HitScanTrace();
+
+
+	void PlayImpactEffect(EPhysicalSurface SurfaceType, FVector ImpactPoint);
 public:	
 
 	void StartFire();
