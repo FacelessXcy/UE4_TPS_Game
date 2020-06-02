@@ -43,6 +43,14 @@ public:
 
 	UPROPERTY(Replicated,BlueprintReadOnly,Category="Health")
 	bool bDied;
+
+	UPROPERTY(Replicated,BlueprintReadOnly, Category = "Energy")
+	float EnergyPercent;
+
+	UPROPERTY(Replicated)
+	float PowerupInterval;
+
+	void CalculateEnergyPercent(float DeltaTime);
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -72,4 +80,9 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	virtual FVector GetPawnViewLocation() const override;
+	UPROPERTY(Replicated)
+	bool bGetEnergy;
+
+	UPROPERTY(Replicated)
+	float TempEnergy;
 };

@@ -23,12 +23,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly,BlueprintReadWrite,Category="Health Components")
 	float DefaultHealth;
 
-	UPROPERTY(Replicated,BlueprintReadWrite, Category = "Health Components")
+	UPROPERTY(ReplicatedUsing= OnRep_Health,BlueprintReadWrite, Category = "Health Components")
 	float CurrentHealth;
+
+	//OldHealth由引擎自动保存并传入
+	UFUNCTION()
+	void OnRep_Health(float OldHealth);
 
 	UFUNCTION()
 	void HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
+
+	UFUNCTION(BlueprintCallable,Category="Health Components")
+	void Heal(float HealAmount);
+
+	UPROPERTY(BlueprintReadOnly, Category = "Health Components")
+	float HealthPercent;
 public:	
 	UPROPERTY(BlueprintAssignable,Category="Events")
 	FOnHealthChangedSignature OnHealthChanged;
+
+	float GetCurrentHealth() const;
 };

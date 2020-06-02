@@ -108,7 +108,13 @@ void ASWeapon::Fire()
 			//获取返回的材质的类型
 			SurfaceType = UPhysicalMaterial::DetermineSurfaceType(OutHit.PhysMaterial.Get());
 			
-			UGameplayStatics::ApplyPointDamage(HitActor, this->BaseDamage * 4.0f, ShotDirection, OutHit, MyOwner->GetInstigatorController(), this, DamageType);
+			float ActualDamage = BaseDamage;
+			if (SurfaceType==SURFACETYPE_FleshVulnerable)
+			{
+				ActualDamage = BaseDamage * 4.0f;
+			}
+
+			UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, ShotDirection, OutHit, MyOwner->GetInstigatorController(), this, DamageType);
 
 			PlayImpactEffect(SurfaceType, OutHit.ImpactPoint);
 		}
@@ -140,6 +146,7 @@ bool ASWeapon::ServerFire_Validate()
 	return true;
 }
 
+//客户端在接收到HitScanTrace数据后，会调用该函数
 void ASWeapon::OnRep_HitScanTrace()
 {
 	//通过服务器端，分发给所有客户端

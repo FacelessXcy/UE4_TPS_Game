@@ -23,13 +23,29 @@ void USHealthComponent::BeginPlay()
 	Super::BeginPlay();
 	if (this->GetOwnerRole()==ROLE_Authority)
 	{
-		this->CurrentHealth = this->DefaultHealth;
 		AActor* MyOwner = this->GetOwner();
 		if (MyOwner)
 		{
 			MyOwner->OnTakeAnyDamage.AddDynamic(this, &USHealthComponent::HandleTakeAnyDamage);
 		}
 	}
+	this->CurrentHealth = this->DefaultHealth;
+	this->HealthPercent = CurrentHealth / this->DefaultHealth;
+}
+
+void USHealthComponent::OnRep_Health(float OldHealth)
+{
+	/*if (GetOwner()->Role == ROLE_Authority)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("OnRep_Health Current Health is %s of %s in Server"), *FString::SanitizeFloat(this->CurrentHealth), *GetOwner()->GetName());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("OnRep_Health Current Health is %s of %s in Client"), *FString::SanitizeFloat(this->CurrentHealth), *GetOwner()->GetName());
+	}*/
+	float Damage = CurrentHealth - OldHealth;
+	this->HealthPercent = CurrentHealth / this->DefaultHealth;
+	this->OnHealthChanged.Broadcast(this, this->CurrentHealth, Damage, nullptr, nullptr, nullptr);
 }
 
 void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
@@ -39,8 +55,41 @@ void USHealthComponent::HandleTakeAnyDamage(AActor* DamagedActor, float Damage, 
 		return;
 	}
 	this->CurrentHealth = FMath::Clamp(this->CurrentHealth - Damage, 0.0f, this->DefaultHealth);
-	UE_LOG(LogTemp, Warning, TEXT("Health Changed: %s :"), *FString::SanitizeFloat(this->CurrentHealth));
+	this->HealthPercent = CurrentHealth / this->DefaultHealth;
+	/*if (GetOwner()->Role==ROLE_Authority)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Current Health is %s of %s in Server"), *FString::SanitizeFloat(this->CurrentHealth), *GetOwner()->GetName());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Current Health is %s of %s in Client"), *FString::SanitizeFloat(this->CurrentHealth), *GetOwner()->GetName());
+	}*/
+	
 	this->OnHealthChanged.Broadcast(this, this->CurrentHealth, Damage, DamageType, InstigatedBy, DamageCauser);
+}
+
+void USHealthComponent::Heal(float HealAmount)
+{
+	if (HealAmount<=0.0f||CurrentHealth<=0.0f)
+	{
+		return;
+	}
+	CurrentHealth = FMath::Clamp(CurrentHealth + HealAmount, 0.0f, 100.0f);
+	this->HealthPercent = CurrentHealth / this->DefaultHealth;
+	/*if (GetOwner()->Role == ROLE_Authority)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Health Changed :%s(+%s) in Server"), *FString::SanitizeFloat(this->CurrentHealth), *FString::SanitizeFloat(HealAmount));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("Health Changed :%s(+%s) in Client"), *FString::SanitizeFloat(this->CurrentHealth), *FString::SanitizeFloat(HealAmount));
+	}*/
+	this->OnHealthChanged.Broadcast(this, this->CurrentHealth, -HealAmount, nullptr, nullptr, nullptr);
+}
+
+float USHealthComponent::GetCurrentHealth() const
+{
+	return this->CurrentHealth;
 }
 
 //指定复制Actor的内容和方式
@@ -48,7 +97,6 @@ void USHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	//CurrentHealth复制到USHealthComponent上 
-	//COND_SkipOwner 服务器端在分发时，忽略发送者
 	DOREPLIFETIME(USHealthComponent, CurrentHealth);
 
 }

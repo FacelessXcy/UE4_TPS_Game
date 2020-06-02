@@ -13,10 +13,11 @@
 
 // Sets default values
 ASCharacter::ASCharacter()
-{
+{ 
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	NetUpdateFrequency = 100.0f;
+	MinNetUpdateFrequency = 66.0f;
 	this->SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComp"));
 	this->SpringArmComp->SetupAttachment(this->GetRootComponent());
 	this->SpringArmComp->TargetArmLength = 300.0f;
@@ -31,13 +32,15 @@ ASCharacter::ASCharacter()
 	//开启下蹲功能
 	this->GetMovementComponent()->GetNavAgentPropertiesRef().bCanCrouch = true;
 
-
+	
 	this->DefaultFOV = this->CameraComp->FieldOfView;
 	this->ZoomedFov = 65.0f;
 	this->bWantToZoom = false;
 	this->ZoomInterpSpeed = 20.0f;
 	this->bDied = false;
+	this->bGetEnergy = false;
 }
+
 
 // Called when the game starts or when spawned
 void ASCharacter::BeginPlay()
@@ -67,10 +70,21 @@ void ASCharacter::BeginPlay()
 	
 }
 
+void ASCharacter::CalculateEnergyPercent(float DeltaTime)
+{
+	this->TempEnergy -= DeltaTime;
+	this->EnergyPercent = this->TempEnergy / this->PowerupInterval;
+}
+
 // Called every frame
 void ASCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	if (this->bGetEnergy)
+	{
+		CalculateEnergyPercent(DeltaTime);
+	}
 
 	float TargetFOV = this->bWantToZoom ? this->ZoomedFov : this->DefaultFOV;
 	float CurrentFOV = FMath::FInterpTo(this->CameraComp->FieldOfView, TargetFOV, DeltaTime, this->ZoomInterpSpeed);
@@ -189,4 +203,8 @@ void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	//CurrentWeapon复制到ASCharacter上
 	DOREPLIFETIME(ASCharacter, CurrentWeapon);
 	DOREPLIFETIME(ASCharacter, bDied);
+	DOREPLIFETIME(ASCharacter, EnergyPercent);
+	DOREPLIFETIME(ASCharacter, bGetEnergy);
+	DOREPLIFETIME(ASCharacter, PowerupInterval);
+	DOREPLIFETIME(ASCharacter, TempEnergy);
 }
