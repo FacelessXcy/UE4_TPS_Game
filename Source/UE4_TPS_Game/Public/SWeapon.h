@@ -88,8 +88,9 @@ protected:
 
 	void PlayImpactEffect(EPhysicalSurface SurfaceType, FVector ImpactPoint);
 public:	
-
+	
 	void StartFire();
+	
 	void EndFire();
 
 };

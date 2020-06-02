@@ -67,9 +67,6 @@ protected:
 	void StartZoom();
 	void EndZoom();
 
-	void StartFire();
-	void EndFire();
-
 	UFUNCTION()
 	void OnHealthChanged(USHealthComponent* HealthComponent, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
 public:	
@@ -85,4 +82,9 @@ public:
 
 	UPROPERTY(Replicated)
 	float TempEnergy;
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+		void StartFire();
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+		void EndFire();
 };
